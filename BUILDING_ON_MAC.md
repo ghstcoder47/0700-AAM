@@ -77,6 +77,12 @@ Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
   - In CLASSIC, moving a value slider on an empty step now creates the note.
   - Nudge wraps the pad's notes around inside the sequence. The engine's `nudgeNotes()` erased
     notes pushed before the start and let notes run past the end.
+  - Turning a step off with the step buttons erased the notes of every pad on that step; now it
+    erases only the selected pad's note.
+- **Grid View pencil tool, SHIFT shortcuts** (`kick_GridPencilTool.{h,cpp}`). With the SHIFT button
+  held or latched: a tap on a note deletes it, dragging from an empty spot selects the notes in a
+  rectangle, and a tap on an empty spot clears the selection. Dragging a note still moves it.
+  Without SHIFT nothing changes.
 
 ### Simulator (`KT_KickEM`)
 
