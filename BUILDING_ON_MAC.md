@@ -59,6 +59,20 @@ Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
   factory content. The Sampler's fader is the record threshold (default about −14 dB):
   recording starts once the input exceeds it. Use headphones with Monitor on, or the
   speakers feed back into the microphone.
+- **Drum grid in the Step Sequencer** (`kick_DrumGrid.{h,cpp}`). STEP SEQ now opens a grid with
+  the 16 pads of the selected pad's bank as rows and the steps of the current page as columns.
+  The GRID/CLASSIC button in the header switches back to the original view. Pad, bar, page and
+  time division come from the existing controls.
+  - *NOTES layer:* tap sets or clears a step; a swipe along a row paints or erases.
+  - *VELOCITY / PROBABILITY / RATCHET layers:* each cell is a small fader. Tapping an empty step
+    creates the note at the tapped height; tapping a note selects it; a swipe draws values.
+  - *Dial and + / −:* change the selected note's value; with no note selected (always in NOTES)
+    they nudge the selected pad.
+  - Tapping a pad name selects that pad. The playing step is highlighted.
+- **Step Sequencer changes** (both views):
+  - In CLASSIC, moving a value slider on an empty step now creates the note.
+  - Nudge wraps the pad's notes around inside the sequence. The engine's `nudgeNotes()` erased
+    notes pushed before the start and let notes run past the end.
 
 ### Simulator (`KT_KickEM`)
 
