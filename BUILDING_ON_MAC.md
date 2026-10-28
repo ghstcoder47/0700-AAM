@@ -45,6 +45,20 @@ Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
   into `Kick/build-sim`, but `open` starts apps in `/`, so the UI came up empty. If `./assets`
   is missing, the app now changes to the folder holding `Kick.app` (macOS only). Projects, logs and
   prefs are therefore written to `Kick/build-sim/`.
+- **Audio fixes** (bugs in the upstream code, not in the stand-ins):
+  - *Feedback on project load.* `AudioObject.h` declared the object-ID counter `static` in a
+    header, so every translation unit had its own counter and IDs collided. A synth object got
+    the input port's ID, and its routing then wired the microphone to the outputs and sends.
+    The counter is now a single `inline std::atomic`.
+  - *Preview starts mid-sample.* `audioPreview` faded in over 1 s, so the start of a sample
+    was inaudible. The fade is now 10 ms.
+  - *Sampler waveform stays flat.* The recorder thumbnail always used the same cache hash and
+    kept showing the empty picture cached right after REC. The cached entry is now dropped
+    before each refresh. The recording itself was fine.
+- **Sampling tips.** Your own samples go in `Kick/build-sim/data/samplesKick/`; there is no
+  factory content. The Sampler's fader is the record threshold (default about −14 dB):
+  recording starts once the input exceeds it. Use headphones with Monitor on, or the
+  speakers feed back into the microphone.
 
 ### Simulator (`KT_KickEM`)
 
@@ -125,7 +139,8 @@ screen. Two things to know there:
 - **Quitting** ends in a crash after the window closes, in `Kick` and `KT_KickEM`. Static
   `MTAudioInterface` is destroyed after JUCE's MIDI device-list singleton
   (`~MidiDeviceListConnection`). macOS may then reopen the app on its own.
-- Audio, recording and the drum filter compile and are wired in, but have not been listened to.
+- Sample preview, the looper and the sampler have been tried by ear in `KT_KickEM`; the drum
+  filter and most other audio paths have not.
 - Nothing has been built for the device itself (aarch64 Buildroot).
 
 `Kick/apps/kick/Main.cpp` also gains a desktop-only debugging aid: set `KICK_SNAPSHOT` to a
