@@ -65,9 +65,13 @@ Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
   time division come from the existing controls.
   - *NOTES layer:* tap sets or clears a step; a swipe along a row paints or erases.
   - *VELOCITY / PROBABILITY / RATCHET layers:* each cell is a small fader. Tapping an empty step
-    creates the note at the tapped height; tapping a note selects it; a swipe draws values.
-  - *Dial and + / −:* change the selected note's value; with no note selected (always in NOTES)
-    they nudge the selected pad.
+    creates the note at the tapped height; tapping a note selects only that note; a swipe draws
+    values. With the SHIFT button held or latched, a tap adds or removes a note from the
+    selection and dragging adds a rectangle (across pads and steps); SHIFT + tap on an empty
+    step clears the selection.
+  - *Dial and + / −:* change all selected notes relatively (each stops at its limit); with
+    nothing selected (always in NOTES) they nudge the selected pad. Tapping the grid releases the
+    keyboard focus of other controls so the dial reaches the grid.
   - Tapping a pad name selects that pad. The playing step is highlighted.
 - **Step Sequencer changes** (both views):
   - In CLASSIC, moving a value slider on an empty step now creates the note.
