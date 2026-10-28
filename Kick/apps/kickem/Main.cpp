@@ -1,98 +1,145 @@
 /*
   ==============================================================================
 
-    This file contains the basic startup code for a JUCE application.
+    KT_KickEM - desktop simulator of the KICK control surface.
+    Runs the full KICK app (same start-up as apps/kick/Main.cpp) inside a panel
+    that replaces the serial control surface with on-screen pads, buttons and encoders.
 
   ==============================================================================
 */
 
-#include <simulator/kick_Simulator.h>
-//==============================================================================
-class KickApplication  : public juce::JUCEApplication
+#include "kick_ui/kick_ui.h"
+#include "audio_engine/audio_engine.h"
+#include "kick_device_adapter.h"
+#include "kick_audio_engine_adapter.h"
+#include "kick_audio_interface.h"
+#include "simulator/kick_Simulator.h"
+
+// Scales the fixed-size simulator panel down to fit smaller displays.
+class ScaledPanel : public juce::Component
 {
 public:
-    //==============================================================================
-    KickApplication() {}
-
-    const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
-    const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
-    bool moreThanOneInstanceAllowed() override             { return true; }
-
-    //==============================================================================
-    void initialise (const juce::String& /*commandLine*/) override
+    ScaledPanel()
     {
-        // This method is where you should put your application's initialisation code..
+        addAndMakeVisible( panel );
+        panel.setTopLeftPosition( 0, 0 );
+    }
 
-        mainWindow.reset (new MainWindow (getApplicationName()));
+    void setScale( float scale )
+    {
+        panel.setTransform( juce::AffineTransform::scale( scale ) );
+        setSize( juce::roundToInt( sim::Simulator::panelWidth * scale ), juce::roundToInt( sim::Simulator::panelHeight * scale ) );
+    }
+
+private:
+    sim::Simulator panel;
+};
+
+//==============================================================================
+class KickEmApplication : public juce::JUCEApplication
+{
+public:
+    const juce::String getApplicationName() override { return "KT_KickEM"; }
+    const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
+    bool               moreThanOneInstanceAllowed() override { return false; }
+
+    void initialise( const juce::String& /*commandLine*/ ) override
+    {
+#if JUCE_MAC
+        // kick_paths.cpp resolves ./assets, ./demos, ... against the working directory; `open` starts
+        // apps in "/", so fall back to the folder holding the bundle (the build directory).
+        if( !juce::File::getCurrentWorkingDirectory().getChildFile( "assets" ).isDirectory() )
+            juce::File::getSpecialLocation( juce::File::currentApplicationFile ).getParentDirectory().setAsCurrentWorkingDirectory();
+#endif
+        audioInterface.reset( new KickAudioInterface() );
+        engineAdapter.reset( new KickAudioEngineAdapter( audioInterface ) );
+        adapter.reset( new KickDeviceAdapter() );
+
+        mt::getSettings();
+        mt::getAudioInterface();
+
+        w = std::make_unique<MainWindow>( getApplicationName() );
+
+        // Desktop debugging aid: KICK_SNAPSHOT=<file.png> renders the window to a PNG after
+        // KICK_SNAPSHOT_DELAY_MS (default 4000) and quits.
+        if( auto path = juce::SystemStats::getEnvironmentVariable( "KICK_SNAPSHOT", {} ); path.isNotEmpty() )
+        {
+            const int delay = juce::SystemStats::getEnvironmentVariable( "KICK_SNAPSHOT_DELAY_MS", "4000" ).getIntValue();
+            juce::Timer::callAfterDelay( delay, [this, path] {
+                auto* content = w->getContentComponent();
+                auto  image   = content->createComponentSnapshot( content->getLocalBounds() );
+                juce::File file( path );
+                file.deleteFile();
+                juce::FileOutputStream out( file );
+                juce::PNGImageFormat().writeImageToStream( image, out );
+                out.flush();
+                quit();
+            } );
+        }
     }
 
     void shutdown() override
     {
-        // Add your application's shutdown code here..
-
-        mainWindow = nullptr; // (deletes our window)
+        w       = nullptr;
+        adapter = nullptr;
     }
 
-    //==============================================================================
     void systemRequestedQuit() override
     {
-        // This is called when the app is being asked to quit: you can ignore this
-        // request and let the app carry on running, or call quit() to allow the app to close.
-        quit();
+        auto mgr = juce::ModalComponentManager::getInstance();
+        if( mgr->cancelAllModalComponents() )
+            juce::Timer::callAfterDelay( 100, [this] { quit(); } );
+        else
+            quit();
     }
 
-    void anotherInstanceStarted (const juce::String& /*commandLine*/) override
-    {
-        // When another instance of the app is launched while this one is running,
-        // this method is invoked, and the commandLine parameter tells you what
-        // the other instance's command-line arguments were.
-    }
+    void anotherInstanceStarted( const juce::String& ) override {}
 
-    //==============================================================================
-    /*
-        This class implements the desktop window that contains an instance of
-        our MainComponent class.
-    */
-    class MainWindow    : public juce::DocumentWindow
+    class MainWindow : public juce::DocumentWindow
     {
     public:
-        MainWindow (juce::String name)
-            : DocumentWindow (name,
-                              juce::Desktop::getInstance().getDefaultLookAndFeel()
-                                                          .findColour (juce::ResizableWindow::backgroundColourId),
-                              DocumentWindow::allButtons)
+        explicit MainWindow( const juce::String& name )
+            : juce::DocumentWindow( name, juce::Colours::black, juce::DocumentWindow::closeButton | juce::DocumentWindow::minimiseButton )
         {
-            setFullScreen(true);
-            setUsingNativeTitleBar (true);
-            setContentOwned (&siml, true);
-            setResizable (false, false);
-            setVisible (true);
+            setUsingNativeTitleBar( true );
+
+            // KICK_SIM_SCALE overrides the automatic fit-to-screen scale.
+            float scale = juce::SystemStats::getEnvironmentVariable( "KICK_SIM_SCALE", "0" ).getFloatValue();
+            if( scale <= 0.0f )
+            {
+                auto area = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
+                scale     = juce::jmin( 1.0f,
+                                    (float)( area.getWidth() - 20 ) / (float)sim::Simulator::panelWidth,
+                                    (float)( area.getHeight() - 40 ) / (float)sim::Simulator::panelHeight );
+            }
+            panel.setScale( scale );
+
+            setContentNonOwned( &panel, true );
+            setResizable( false, false );
+            centreWithSize( getWidth(), getHeight() );
+            setVisible( true );
         }
 
-        void closeButtonPressed() override
-        {
-            // This is called when the user tries to close this window. Here, we'll just
-            // ask the app to quit when this happens, but you can change this to do
-            // whatever you need.
-            JUCEApplication::getInstance()->systemRequestedQuit();
-        }
+        ~MainWindow() override { clearContentComponent(); }
 
-        /* Note: Be careful if you override any DocumentWindow methods - the base
-           class uses a lot of them, so by overriding you might break its functionality.
-           It's best to do all your work in your content component instead, but if
-           you really have to override any DocumentWindow methods, make sure your
-           subclass also calls the superclass's method.
-        */
+        void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
+
+        void inputAttemptWhenModal() override
+        {
+            auto numModal = getNumCurrentlyModalComponents();
+            if( auto p = getCurrentlyModalComponent( juce::jmax( 0, numModal - 1 ) ) )
+                p->toFront( true );
+        }
 
     private:
-        sim::Simulator siml;
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
+        ScaledPanel panel;
     };
 
 private:
-    std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<MainWindow>                w;
+    std::unique_ptr<KickDeviceAdapter>         adapter;
+    std::unique_ptr<KickAudioEngineAdapter>    engineAdapter;
+    std::shared_ptr<contracts::AudioInterface> audioInterface;
 };
 
-//==============================================================================
-// This macro generates the main() routine that launches the app.
-START_JUCE_APPLICATION (KickApplication)
+START_JUCE_APPLICATION( KickEmApplication )

@@ -48,6 +48,8 @@ juce_add_gui_app(${TargetName}
         PRODUCT_NAME ${TargetName}
         COMPANY_NAME ${TargetCompany}
         REQUIRES_FULL_SCREEN TRUE
+        MICROPHONE_PERMISSION_ENABLED TRUE
+        MICROPHONE_PERMISSION_TEXT "KICK records and samples from the audio input."
 )
 
 set_target_properties(${TargetName} PROPERTIES 

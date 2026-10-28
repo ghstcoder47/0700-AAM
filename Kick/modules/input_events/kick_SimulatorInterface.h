@@ -1,10 +1,19 @@
 #pragma once
 
-class SimulatorInterface
-{
-public:
-    virtual ~SimulatorInterface() {}
-    virtual void sendMessageToHW( int code, const std::vector<juce::int8>& ) = 0;
+#include <functional>
+#include <PktMgr/PktMgr.hpp>
 
-    SIGNALS : sigslot::signal<int, const std::vector<char>&> hwInputReceived;
+// Hook for the desktop simulator (KT_KickEM, compiled with SIM_BUILD=1).
+// The simulator injects control-surface input via Controls::InputEvents::dispatchHardwareEvent
+// and installs this handler to receive every packet the app would send to the control surface
+// (pad colours, button LEDs, ...). The handler may be called from any thread.
+struct SimulatorInterface
+{
+    using Handler = std::function<void( const CPktMgr::HWMsg_t& )>;
+
+    static Handler& messageToHardware()
+    {
+        static Handler handler;
+        return handler;
+    }
 };
