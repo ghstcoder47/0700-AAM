@@ -18,7 +18,6 @@ namespace Controls
     /// Static members...
     static std::array<uint8_t, BUFFER_RX_SIZE> ms_arrui8RxBufferUsb;
     static std::array<uint8_t, BUFFER_RX_SIZE> ms_arrui8TxBufferUsb;
-    static SimulatorInterface*                 simInterface{ nullptr };
     static CPktMgr                             ms_objPktMgrUsb{ CPktMgr::EN_COM_CHANNEL_USB, ms_arrui8RxBufferUsb.data(), BUFFER_RX_SIZE, ms_arrui8TxBufferUsb.data(), BUFFER_RX_SIZE, 60 };
 
     sigslot::signal<CPktMgr::HWMsg_t&> Controls::InputEvents::dispatchHardwareEvent = {};
@@ -306,11 +305,8 @@ namespace Controls
     void Controls::InputEvents::initialize()
     {
 #ifdef SIM_BUILD
-        //creating multiple instance of SimulatorInterface using factoty is somehow clearing the connected signals need to find the reason
-        simInterface = Factory<SimulatorInterface>::makeObject( 0 );
-        simInterface->hwInputReceived.connect( []( int id, const std::vector<char>& data ) {
-            Controls::InputEvents::dispatchHardwareEvent( id, data );
-        } );
+        // No serial control surface: KT_KickEM emits dispatchHardwareEvent itself and receives
+        // outgoing packets through SimulatorInterface::messageToHardware().
 #else
         if( !_FPPort )
         {
@@ -356,7 +352,8 @@ namespace Controls
         }
 
 #ifdef SIM_BUILD
-        if( simInterface ) simInterface->sendMessageToHW( f_HwMsg );
+        if( auto& handler = SimulatorInterface::messageToHardware() ) handler( f_HwMsg );
+        return;
 #endif
         if( _FPPort ) _FPPort->sendMessageToControlSurface( f_HwMsg );
         else

@@ -3,7 +3,7 @@
 > **Provenance.** The stand-ins below come from the `macos-build` branch of
 > [Eight4aWish/0700-AAM](https://github.com/Eight4aWish/0700-AAM/tree/macos-build) (AGPL-3.0, same
 > project), merged here unchanged with its history. Changes made on top in this fork
-> (NeonByteVoid/0700-AAM) are listed under [Additions in this fork](#additions-in-this-fork).
+> (ghstcoder47/0700-AAM) are listed under [Additions in this fork](#additions-in-this-fork).
 
 This is the `macos-build` branch of [Eight4aWish/0700-AAM](https://github.com/Eight4aWish/0700-AAM),
 a fork of [MusicTribeOpenSource/0700-AAM](https://github.com/MusicTribeOpenSource/0700-AAM). It is
@@ -23,6 +23,13 @@ Kick/build-mac.sh          # configure + build the Kick target
 open Kick/build-sim/Kick.app
 ```
 
+The desktop simulator (Kick plus an on-screen control panel, see [Simulator](#simulator-kt_kickem)):
+
+```bash
+Kick/build-mac.sh KT_KickEM
+open --env KICK_NO_AUDIO_INPUT=1 Kick/build-sim/KT_KickEM.app
+```
+
 ## Additions in this fork
 
 Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
@@ -38,6 +45,43 @@ Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
   into `Kick/build-sim`, but `open` starts apps in `/`, so the UI came up empty. If `./assets`
   is missing, the app now changes to the folder holding `Kick.app` (macOS only). Projects, logs and
   prefs are therefore written to `Kick/build-sim/`.
+
+### Simulator (`KT_KickEM`)
+
+`KT_KickEM` (`-DKICK_SIMULATOR=ON`, which `build-mac.sh` sets) runs the full Kick app, started
+the same way as `apps/kick/Main.cpp`, with an on-screen control surface in place of the serial
+panel link. The old panel code predated the current packet protocol and its image assets are
+no longer in the release, so it was rewritten with plain JUCE widgets:
+
+- `Kick/apps/kickem/simulator/kick_Simulator.{h,cpp}`: 16 pads, 16 Q-link encoders, the
+  centre encoder (push = ENTER), mode, bank, transport, level and navigation buttons, and SHIFT.
+  The panel draws the pad colours and button LEDs that the app sends back.
+- `Kick/modules/input_events/kick_SimulatorInterface.h` and `input_events.cpp`: with
+  `SIM_BUILD=1` (simulator target only) no serial port is opened. Controls inject
+  `CPktMgr::HWMsg_t` packets through `Controls::InputEvents::dispatchHardwareEvent`, the same
+  path as serial input. Outgoing pad and LED packets go to a `SimulatorInterface::messageToHardware()`
+  handler instead of the port. The `Kick` target is unchanged.
+- The old `kick_SimulatorMainControl`, `kick_SimulatorControls` and `kick_SimulatorInterfaceImpl`
+  were removed.
+
+Operating the panel:
+
+- Encoders: drag up/down (6 px per step) or use the mouse wheel; clicking the centre encoder
+  sends ENTER.
+- SHIFT latches for one press. Holding the keyboard's Shift key also works. Shifted functions
+  (GRID, SAVE, bank E–H, ...) are labelled under each button and send their own button IDs,
+  as the app expects.
+
+The panel is 1484 × 900 and is scaled down to fit the screen. `KICK_SIM_SCALE=<factor>`
+overrides the scale.
+
+Simplifications, from reading the app rather than the hardware:
+
+- Pads are hit at a fixed velocity of 100 with no aftertouch.
+- The master/rec knobs and the slider are not simulated; the app does not consume slider
+  packets.
+- How the real panel combines LEDs is a guess: bank LEDs and PLAY/STOP/PLAY START are shown
+  as radio groups.
 
 ## What was missing, and what stands in for it
 
@@ -78,10 +122,9 @@ screen. Two things to know there:
 
 ## Not done yet
 
-- **The simulator (`KT_KickEM`)** still fails: its panel code predates the current packet
-  protocol (it uses `sig::Signal`, `mt::Kick::HwControlCommands` and button helpers that
-  no longer exist). The `Kick` app does not need it.
-- **Quitting** ends in an abort (exit 134) after the window closes.
+- **Quitting** ends in a crash after the window closes, in `Kick` and `KT_KickEM`. Static
+  `MTAudioInterface` is destroyed after JUCE's MIDI device-list singleton
+  (`~MidiDeviceListConnection`). macOS may then reopen the app on its own.
 - Audio, recording and the drum filter compile and are wired in, but have not been listened to.
 - Nothing has been built for the device itself (aarch64 Buildroot).
 
