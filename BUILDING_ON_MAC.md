@@ -1,5 +1,10 @@
 # Building the KICK app on a Mac
 
+> **Provenance.** The stand-ins below come from the `macos-build` branch of
+> [Eight4aWish/0700-AAM](https://github.com/Eight4aWish/0700-AAM/tree/macos-build) (AGPL-3.0, same
+> project), merged here unchanged with its history. Changes made on top in this fork
+> (NeonByteVoid/0700-AAM) are listed under [Additions in this fork](#additions-in-this-fork).
+
 This is the `macos-build` branch of [Eight4aWish/0700-AAM](https://github.com/Eight4aWish/0700-AAM),
 a fork of [MusicTribeOpenSource/0700-AAM](https://github.com/MusicTribeOpenSource/0700-AAM). It is
 not made, approved or supported by Music Tribe. `main` follows upstream unchanged.
@@ -13,9 +18,26 @@ Built on macOS (Apple Silicon) with Apple clang 21, CMake 4.0 and Ninja, against
 with the release's own multitouch patch.
 
 ```bash
+brew install cmake ninja   # if not installed yet
 Kick/build-mac.sh          # configure + build the Kick target
 open Kick/build-sim/Kick.app
 ```
+
+## Additions in this fork
+
+Verified on macOS 26.5 (Apple Silicon), Apple clang 21, CMake 4.4, Ninja 1.13.
+
+- **Microphone permission.** The `Kick` target now declares `NSMicrophoneUsageDescription`.
+  Without it the app froze on start inside CoreAudio (black window), because opening the input
+  device waits on macOS's microphone permission. On first launch, and again after every rebuild
+  (the ad-hoc signature changes), macOS asks; the window stays black until you answer.
+  `KICK_NO_AUDIO_INPUT=1` opens the audio device output-only and skips the prompt:
+  `open --env KICK_NO_AUDIO_INPUT=1 Kick/build-sim/Kick.app`.
+- **Working directory.** On macOS `kick_paths.cpp` looks for `./assets`, `./demos`, `./templates`,
+  `./projects`, ... relative to the working directory. CMake copies assets, demos and templates
+  into `Kick/build-sim`, but `open` starts apps in `/`, so the UI came up empty. If `./assets`
+  is missing, the app now changes to the folder holding `Kick.app` (macOS only). Projects, logs and
+  prefs are therefore written to `Kick/build-sim/`.
 
 ## What was missing, and what stands in for it
 

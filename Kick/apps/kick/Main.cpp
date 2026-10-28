@@ -128,6 +128,13 @@ public:
     //==============================================================================
     void initialise( const juce::String& /*commandLine*/ ) override
     {
+#if JUCE_MAC
+        // Desktop aid: on macOS kick_paths.cpp resolves ./assets, ./demos, ... against the working
+        // directory. `open Kick.app` starts in "/", so fall back to the folder holding the bundle
+        // (the build directory, where CMake copies assets, demos and templates).
+        if( !juce::File::getCurrentWorkingDirectory().getChildFile( "assets" ).isDirectory() )
+            juce::File::getSpecialLocation( juce::File::currentApplicationFile ).getParentDirectory().setAsCurrentWorkingDirectory();
+#endif
         audioInterface.reset(new KickAudioInterface());
         engineAdapter.reset(new KickAudioEngineAdapter(audioInterface));
         

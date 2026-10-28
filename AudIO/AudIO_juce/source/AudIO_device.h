@@ -27,8 +27,11 @@ namespace mt
 
         void start( uint32_t samplerate, uint32_t blocksize ) override
         {
+            // Desktop aid: KICK_NO_AUDIO_INPUT=1 opens the device output-only, so macOS does not
+            // ask for (and block on) microphone access, which it re-asks after every rebuild.
+            const int ins = juce::SystemStats::getEnvironmentVariable( "KICK_NO_AUDIO_INPUT", {} ).getIntValue() != 0 ? 0 : numIns;
             juce::AudioDeviceManager::AudioDeviceSetup setup;
-            deviceManager.initialise( numIns, numOuts, nullptr, true, name, nullptr );
+            deviceManager.initialise( ins, numOuts, nullptr, true, name, nullptr );
             deviceManager.getAudioDeviceSetup( setup );
             setup.sampleRate = (double)samplerate;
             setup.bufferSize = (int)blocksize;
